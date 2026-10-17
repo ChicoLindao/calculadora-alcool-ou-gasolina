@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { getStationHistory, saveStationHistory, deleteStationHistory, type StationHistoryItem } from './actions/stations'
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -24,16 +25,17 @@ const formatBRL = (value: number) =>
 const formatNumber = (value: number, digits = 1) =>
   value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 
-type HistoryItem = {
-  alcohol: number
-  gasoline: number
-  custom: boolean
-  alcoholKm?: number
-  gasolineKm?: number
-  date: string
+const relativeDate = (value: Date | string) => {
+  const days = Math.floor((Date.now() - new Date(value).getTime()) / 86400000)
+  if (days <= 0) return 'Hoje'
+  if (days === 1) return 'Há 1 dia'
+  return `Há ${days} dias`
 }
 
+type HistoryItem = StationHistoryItem
+
 export default function Page() {
+  const [stationName, setStationName] = useState('')
   const [alcohol, setAlcohol] = useState(3.49)
   const [gasoline, setGasoline] = useState(5.29)
   const [custom, setCustom] = useState(false)
@@ -43,8 +45,7 @@ export default function Page() {
   const [calculated, setCalculated] = useState(false)
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('fuel-history')
-    if (saved) setHistory(JSON.parse(saved))
+    getStationHistory().then(setHistory)
   }, [])
 
   const result = useMemo(() => {
@@ -63,18 +64,17 @@ export default function Page() {
     setter(Number(Math.max(0, current + amount).toFixed(2)))
   }
 
-  function calculate() {
-    const item: HistoryItem = { alcohol, gasoline, custom, alcoholKm, gasolineKm, date: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }
-    const next = [item, ...history.filter((entry) => entry.alcohol !== alcohol || entry.gasoline !== gasoline)].slice(0, 4)
-    setHistory(next)
-    window.localStorage.setItem('fuel-history', JSON.stringify(next))
+  async function calculate() {
+    if (stationName.trim()) {
+      await saveStationHistory({ stationName, alcoholPrice: alcohol, gasolinePrice: gasoline, recommendation: result.winner })
+      setHistory(await getStationHistory())
+    }
     setCalculated(true)
   }
 
   function load(item: HistoryItem) {
-    setAlcohol(item.alcohol); setGasoline(item.gasoline); setCustom(item.custom)
-    if (item.alcoholKm) setAlcoholKm(item.alcoholKm)
-    if (item.gasolineKm) setGasolineKm(item.gasolineKm)
+    setStationName(item.stationName)
+    setAlcohol(item.alcoholPrice); setGasoline(item.gasolinePrice)
     setCalculated(false)
   }
 
@@ -98,6 +98,10 @@ export default function Page() {
         <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="glass-card rounded-3xl p-6 sm:p-7">
             <div className="mb-7 flex items-center justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">Sua simulação</p><h2 className="mt-1 text-xl font-semibold">Preços na bomba</h2></div><div className="rounded-xl bg-amber-400/10 p-2.5 text-amber-400"><Gauge className="size-5" /></div></div>
+            <div className="mb-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] px-3 py-2.5">
+              <label htmlFor="station-name" className="block text-xs text-zinc-400">Nome do Posto (Opcional)</label>
+              <input id="station-name" value={stationName} onChange={(event) => setStationName(event.target.value)} placeholder="Ex.: Posto Avenida" className="mt-1 w-full bg-transparent text-sm font-medium text-white outline-none placeholder:text-zinc-600" />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
               <PriceInput label="Preço do Álcool" value={alcohol} setValue={setAlcohol} color="emerald" adjust={adjust} />
               <PriceInput label="Preço da Gasolina" value={gasoline} setValue={setGasoline} color="amber" adjust={adjust} />
@@ -124,7 +128,7 @@ export default function Page() {
         </section>
 
         <section className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="glass-card rounded-3xl p-6"><div className="mb-5 flex items-center justify-between"><div className="flex items-center gap-3"><div className="rounded-xl bg-white/[0.06] p-2.5 text-zinc-400"><History className="size-4" /></div><div><h2 className="font-semibold">Histórico rápido</h2><p className="text-xs text-zinc-500">Suas últimas simulações</p></div></div>{history.length > 0 && <button onClick={() => { setHistory([]); window.localStorage.removeItem('fuel-history') }} className="text-xs text-zinc-500 transition hover:text-white">Limpar</button>}</div>{history.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 py-7 text-center text-xs text-zinc-600">Suas simulações aparecerão aqui</div> : <div className="grid gap-2 sm:grid-cols-2">{history.map((item, index) => <button key={`${item.date}-${index}`} onClick={() => load(item)} className="group flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3.5 text-left transition hover:border-emerald-400/30 hover:bg-white/[0.05]"><div className="flex items-center gap-3"><div className={`size-2 rounded-full ${item.alcohol / item.gasoline < 0.7 ? 'bg-emerald-400' : 'bg-amber-400'}`} /><div><p className="text-sm font-medium">Álcool {formatBRL(item.alcohol)} <span className="text-zinc-600">·</span> Gasolina {formatBRL(item.gasoline)}</p><p className="mt-1 text-[10px] text-zinc-600">Hoje, {item.date}</p></div></div><RotateCcw className="size-3.5 text-zinc-600 transition group-hover:text-emerald-400" /></button>)}</div>}</div>
+          <div className="glass-card rounded-3xl p-6"><div className="mb-5 flex items-center justify-between"><div className="flex items-center gap-3"><div className="rounded-xl bg-white/[0.06] p-2.5 text-zinc-400"><History className="size-4" /></div><div><h2 className="font-semibold">Histórico rápido</h2><p className="text-xs text-zinc-500">Suas últimas simulações</p></div></div>{history.length > 0 && <button onClick={async () => { await deleteStationHistory(); setHistory([]) }} className="text-xs text-zinc-500 transition hover:text-white">Limpar</button>}</div>{history.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 py-7 text-center text-xs text-zinc-600">Suas simulações aparecerão aqui</div> : <div className="grid gap-2 sm:grid-cols-2">{history.map((item) => <button key={item.id} onClick={() => load(item)} className="group flex items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3.5 text-left transition hover:border-emerald-400/30 hover:bg-white/[0.05]"><div className="flex items-center gap-3"><div className={`size-2 rounded-full ${item.alcoholPrice / item.gasolinePrice < 0.7 ? 'bg-emerald-400' : 'bg-amber-400'}`} /><div><p className="text-sm font-semibold text-white">{item.stationName}</p><p className="mt-1 text-xs text-zinc-400">Álcool {formatBRL(item.alcoholPrice)} <span className="text-zinc-600">·</span> Gasolina {formatBRL(item.gasolinePrice)}</p><p className="mt-1 text-[10px] text-zinc-600">{relativeDate(item.updatedAt)}</p></div></div><RotateCcw className="size-3.5 text-zinc-600 transition group-hover:text-emerald-400" /></button>)}</div>}</div>
           <div className="glass-card rounded-3xl p-6"><div className="flex items-start gap-3"><div className="rounded-xl bg-amber-400/10 p-2.5 text-amber-400"><CircleHelp className="size-4" /></div><div><h2 className="font-semibold">A regra dos 70%</h2><p className="mt-3 text-sm leading-relaxed text-zinc-400">Em média, um carro abastecido com álcool percorre 70% da distância que percorreria com gasolina. Por isso, compare o preço do álcool com 70% do preço da gasolina.</p><div className="mt-4 flex items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2.5 text-xs text-zinc-300"><span className="font-semibold text-amber-300">Álcool ÷ Gasolina</span><span className="text-zinc-600">&lt;</span><span className="font-semibold text-emerald-300">70%</span><ArrowDownRight className="ml-auto size-4 text-emerald-400" /></div></div></div></div>
         </section>
         <footer className="mt-8 flex items-center justify-between text-[11px] text-zinc-600"><span>Feito para decisões mais inteligentes na estrada.</span><span>Valores por litro · BR</span></footer>

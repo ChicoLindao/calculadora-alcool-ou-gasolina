@@ -1,0 +1,50 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root { color-scheme: dark; }
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 1.75rem;
+}
+
+:root {
+  --background: oklch(0.145 0.02 255);
+  --foreground: oklch(0.98 0.01 255);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.72 0.18 165);
+  --primary: oklch(0.78 0.17 165);
+  --primary-foreground: oklch(0.16 0.03 165);
+  --muted-foreground: oklch(0.65 0.02 255);
+}
+
+* { box-sizing: border-box; }
+html { background: #090d14; }
+body { margin: 0; background: #090d14; font-family: Arial, Helvetica, sans-serif; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+.glass-card { background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); border: 1px solid rgba(255,255,255,.09); box-shadow: 0 20px 70px rgba(0,0,0,.2), inset 0 1px rgba(255,255,255,.04); backdrop-filter: blur(18px); }
+.result-card { background: linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.018)); box-shadow: 0 20px 70px rgba(0,0,0,.22), inset 0 1px rgba(255,255,255,.05); backdrop-filter: blur(18px); }
+.gauge { display: grid; flex-shrink: 0; place-items: center; width: 150px; height: 150px; border-radius: 9999px; background: conic-gradient(var(--gauge-color) var(--gauge-value), rgba(255,255,255,.07) 0); position: relative; }
+.gauge::before { content: ''; position: absolute; inset: 9px; border-radius: inherit; background: #101620; }
+.gauge-inner { position: relative; display: flex; flex-direction: column; align-items: center; }
+.gauge-emerald { --gauge-color: #34d399; --gauge-value: 66%; }
+.gauge-amber { --gauge-color: #fbbf24; --gauge-value: 78%; }
+.gauge-zinc { --gauge-color: #a1a1aa; --gauge-value: 70%; }
+@media (prefers-reduced-motion: no-preference) { .result-card { animation: rise .5s ease-out both; } }
+@keyframes rise { from { opacity: .6; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
